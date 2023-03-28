@@ -7,9 +7,14 @@
 
 import UIKit
 
+protocol CollectionViewTableViewCellDelegate: AnyObject {
+    func didTapCell(_ cell: CollectionViewTableViewCell, viewModel: YoutubePreviewViewModel)
+}
+ 
 class CollectionViewTableViewCell: UITableViewCell {
-    
     static let identifier = "CollectionViewTableViewCell"
+    
+    weak var collectionViewTableViewCellDelegate: CollectionViewTableViewCellDelegate?
     
     private var shows: [Show] = [Show]()
     
@@ -53,6 +58,19 @@ class CollectionViewTableViewCell: UITableViewCell {
         }
     }
     
+    private func downloadItemAt(indexPath: IndexPath) {
+        print("Downloading: \(shows[indexPath.row].original_title)")
+        let show = shows[indexPath.row]
+        CoreDataPersistenceManager.shared.downloadShow(with: show) { result in
+            switch result {
+            case .success(let data):
+                NotificationCenter.default.post(Notification(name: Notification.Name(rawValue: "Downloaded"), object: nil, userInfo: nil))
+            case .failure(let error):
+                print("downloadItem: \(error.localizedDescription)")
+            }
+        }
+    }
+    
 }
 
 extension CollectionViewTableViewCell: UICollectionViewDelegate, UICollectionViewDataSource {
@@ -71,5 +89,46 @@ extension CollectionViewTableViewCell: UICollectionViewDelegate, UICollectionVie
         return cell
     }
     
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        collectionView.deselectItem(at: indexPath, animated: true)
+        
+        let show = shows[indexPath.row]
+        guard let title = show.original_title ?? show.original_name ?? show.name else { return }
+        
+        // https://www.youtube.com/watch?v=yjRHZEUamCc
+        
+        APICaller.shared.searchYoutube(with: "\(title) trailer") { [weak self] result in
+            
+            guard let self = self else { return }
+            
+            switch result {
+            case .success(let data):
+//                print("searchYoutube", data)
+                let viewModel = YoutubePreviewViewModel(
+                    title: title,
+                    youtubeVideo: data,
+                    overview: show.overview ?? "")
+                
+                self.collectionViewTableViewCellDelegate?.didTapCell(self, viewModel: viewModel)
+                
+            case .failure(let error):
+                print(error.localizedDescription)
+            }
+        }
+    }
+    
+    @available(iOS 15.0, *)
+    func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemsAt indexPaths: [IndexPath], point: CGPoint) -> UIContextMenuConfiguration? {
+        let config = UIContextMenuConfiguration(
+            identifier: nil,
+            previewProvider: nil) { _ in
+                let downloadAction = UIAction(title: "Download", subtitle: nil, image: nil, identifier: nil, discoverabilityTitle: nil, state: .off) { _ in
+                    
+                    self.downloadItemAt(indexPath: indexPaths.first!)
+                }
+                return UIMenu(title: "", image: nil, identifier: nil, options: .displayInline, children: [downloadAction])
+            }
+        return config
+    }
     
 }

@@ -25,12 +25,16 @@ class HomeViewController: UIViewController {
         table.register(CollectionViewTableViewCell.self, forCellReuseIdentifier: CollectionViewTableViewCell.identifier)
         return table
     }()
+    
+    private var randomTrendingMovie: Show?
+    private var headerView: HeroHeaderView?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .systemBackground
         
         setupTableView()
+        configHeaderView()
         
 //        fetchData()
     }
@@ -91,6 +95,7 @@ class HomeViewController: UIViewController {
         view.addSubview(homeFeedTable)
         homeFeedTable.delegate = self
         homeFeedTable.dataSource = self
+        
     }
      
     override func viewDidLayoutSubviews() {
@@ -104,15 +109,27 @@ class HomeViewController: UIViewController {
 //            y: 0,
 //            width: view.bounds.width,
 //            height: 400))
-        let heroHeaderView = HeroHeaderView(frame: CGRect(
+        headerView = HeroHeaderView(frame: CGRect(
             x: 0,
             y: 0,
             width: view.bounds.width,
             height: 400))
-        homeFeedTable.tableHeaderView = heroHeaderView
-        
-        
-        
+        homeFeedTable.tableHeaderView = headerView
+    }
+    
+    private func configHeaderView() {
+        APICaller.shared.getTrendingTvs { [weak self] result in
+            switch result {
+            case .success(let show):
+                let randomShow = show.randomElement()
+                self?.randomTrendingMovie = randomShow
+                self?.headerView?.configure(with: ShowViewModel(
+                    title: randomShow?.original_title ?? randomShow?.original_name ?? "",
+                    posterUrl: randomShow?.poster_path ?? ""))
+            case .failure(let error):
+                print("getTrendingTvs: \(error.localizedDescription)")
+            }
+        }
     }
     
     private func configureNavBar() {
@@ -145,6 +162,8 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
             return UITableViewCell()
         }
 //        cell.textLabel?.text = "try \(indexPath.row)"
+        
+        cell.collectionViewTableViewCellDelegate = self
         
         switch indexPath.section {
         case HomeSections.TrendingMovies.rawValue:
@@ -232,4 +251,14 @@ extension HomeViewController: UITableViewDelegate, UITableViewDataSource {
         navigationController?.navigationBar.transform = .init(translationX: 0, y: min(0, -offSet))
     }
     
+}
+
+extension HomeViewController: CollectionViewTableViewCellDelegate {
+    func didTapCell(_ cell: CollectionViewTableViewCell, viewModel: YoutubePreviewViewModel) {
+        DispatchQueue.main.async { [weak self] in
+            let vc = VideoPreviewViewController()
+            vc.configure(with: viewModel)
+            self?.navigationController?.pushViewController(vc, animated: true)
+        }
+    }
 }

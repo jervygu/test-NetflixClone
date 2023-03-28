@@ -7,9 +7,15 @@
 
 import UIKit
 
+protocol SearchResultsViewControllerDelegate: AnyObject {
+    func didTapItem(_ viewModel: YoutubePreviewViewModel)
+}
+
 class SearchResultsViewController: UIViewController {
     
     public var shows: [Show] = [Show]()
+    
+    weak var searchResultsViewControllerDelegate: SearchResultsViewControllerDelegate?
     
     public let collectionView: UICollectionView = {
         let layout = UICollectionViewFlowLayout()
@@ -57,6 +63,25 @@ extension SearchResultsViewController: UICollectionViewDelegate, UICollectionVie
         return cell
     }
     
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        collectionView.deselectItem(at: indexPath, animated: true)
+        let show = shows[indexPath.row]
+        let title = show.original_title ?? show.original_name ?? ""
+        
+        APICaller.shared.searchYoutube(with: title) { [weak self] result in
+            switch result {
+            case .success(let item):
+                self?.searchResultsViewControllerDelegate?.didTapItem(YoutubePreviewViewModel(
+                    title: title,
+                    youtubeVideo: item,
+                    overview: show.overview ?? "Overview"))
+            case .failure(let error):
+                print("searchYoutube: \(error.localizedDescription)")
+            }
+        }
+    }
+    
 }
 
-// https://youtube.com/watch?v=KCgYDCKqato&feature=shares&t=12040
+
+//google api_key AIzaSyDMXVXPiZAphiQScMraw7XkGZKFVKK0S1U

@@ -78,7 +78,7 @@ class SearchViewController: UIViewController {
     
 }
 
-extension SearchViewController: UISearchResultsUpdating {
+extension SearchViewController: UISearchResultsUpdating, SearchResultsViewControllerDelegate {
     func updateSearchResults(for searchController: UISearchController) {
         let searchBar = searchController.searchBar
         guard let query = searchBar.text,
@@ -87,6 +87,8 @@ extension SearchViewController: UISearchResultsUpdating {
               let resultsController = searchController.searchResultsController as? SearchResultsViewController else {
             return
         }
+        
+        resultsController.searchResultsViewControllerDelegate = self
         
         APICaller.shared.searchShow(with: query) { results in
             switch results {
@@ -100,6 +102,15 @@ extension SearchViewController: UISearchResultsUpdating {
             }
         }
     }
+    
+    func didTapItem(_ viewModel: YoutubePreviewViewModel) {
+        DispatchQueue.main.async { [weak self] in
+            let vc = VideoPreviewViewController()
+            vc.configure(with: viewModel)
+            self?.navigationController?.pushViewController(vc, animated: true)
+        }
+    }
+    
 }
 
 extension SearchViewController: UITableViewDelegate, UITableViewDataSource {
@@ -121,5 +132,24 @@ extension SearchViewController: UITableViewDelegate, UITableViewDataSource {
         return 120
     }
     
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        
+        let show = shows[indexPath.row]
+        guard let title = show.original_title ?? show.original_name else { return }
+        
+        APICaller.shared.searchYoutube(with: title) { [weak self] result in
+            switch result {
+            case .success(let item):
+                DispatchQueue.main.async {
+                    let vc = VideoPreviewViewController()
+                    vc.configure(with: YoutubePreviewViewModel(title: title, youtubeVideo: item, overview: show.overview ?? ""))
+                    self?.navigationController?.pushViewController(vc, animated: true)
+                }
+            case .failure(let error):
+                print("searchYoutube: \(error.localizedDescription)")
+            }
+        }
+    }
     
 }

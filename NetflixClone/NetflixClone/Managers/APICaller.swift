@@ -10,6 +10,10 @@ import Foundation
 struct Constants {
     static let API_KEY = "4dcc0cb5bbad7fb3209bd65aca372efe"
     static let baseURL = "https://api.themoviedb.org"
+    static let YoutubeAPI_KEY = "AIzaSyDMXVXPiZAphiQScMraw7XkGZKFVKK0S1U"
+    static let YoutubeBaseURL = "https://youtube.googleapis.com/youtube/v3"
+    // GET https://www.googleapis.com/youtube/v3/search
+    // https://youtube.googleapis.com/youtube/v3/search?q=Insurgent&key=[YOUR_API_KEY] HTTP/1.1
 }
 
 enum APIError: Error {
@@ -159,6 +163,31 @@ class APICaller {
             do {
                 let results = try JSONDecoder().decode(ShowsResponse.self, from: data)
                 completion(.success(results.results))
+            } catch {
+                print("getTopRatedMovies: \(error.localizedDescription)")
+                completion(.failure(APIError.failedToGetData))
+            }
+            
+        }
+        task.resume()
+    }
+    
+    func searchYoutube(with query: String, completion: @escaping(Result<YoutubeItem, Error>) -> Void) {
+        // https://youtube.googleapis.com/youtube/v3/search?q=Insurgent&key=[YOUR_API_KEY]
+        guard let query = query.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) else { return }
+        guard let url = URL(string: "\(Constants.YoutubeBaseURL)/search?q=\(query)&key=\(Constants.YoutubeAPI_KEY)") else { return }
+        
+//        print("searchYoutube url: \(url)")
+        
+        let task = URLSession.shared.dataTask(with: URLRequest(url: url)) { data, response, error in
+            guard let data = data, error == nil else {
+                completion(.failure(APIError.failedToGetData))
+                return
+            }
+            
+            do {
+                let results = try JSONDecoder().decode(YoutubeSearchResponse.self, from: data)
+                completion(.success(results.items.first ?? YoutubeItem(kind: "", etag: "", id: YoutubeItemID(kind: "", videoID: ""))))
             } catch {
                 print("getTopRatedMovies: \(error.localizedDescription)")
                 completion(.failure(APIError.failedToGetData))

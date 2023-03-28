@@ -75,4 +75,24 @@ extension UpcomingViewController: UITableViewDelegate, UITableViewDataSource {
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
         return 120
     }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        
+        let show = shows[indexPath.row]
+        guard let title = show.original_title ?? show.original_name else { return }
+        
+        APICaller.shared.searchYoutube(with: title) { [weak self] result in
+            switch result {
+            case .success(let item):
+                DispatchQueue.main.async {
+                    let vc = VideoPreviewViewController()
+                    vc.configure(with: YoutubePreviewViewModel(title: title, youtubeVideo: item, overview: show.overview ?? ""))
+                    self?.navigationController?.pushViewController(vc, animated: true)
+                }
+            case .failure(let error):
+                print("searchYoutube: \(error.localizedDescription)")
+            }
+        }
+    }
 }
